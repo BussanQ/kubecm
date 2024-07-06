@@ -9,10 +9,3 @@ currently being supported with security updates.
 | ------- | ------------------ |
 | 0.20.x   | :white_check_mark: |
 | < 0.16   | :x:                |
-
-
-## Reporting a Vulnerability
-
-Use this section to tell people how to report a vulnerability.
-
-For any security-related content, you can create an [Issue](https://github.com/sunny0826/kubecm/issues/new/choose) and @sunny0826 or email it to guoxudong.dev@gmail.com.
