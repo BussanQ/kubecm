@@ -1,6 +1,6 @@
-module github.com/sunny0826/kubecm
+module github.com/BussanQ/kubecm
 
-go 1.22.2
+go 1.22.9
 
 require (
 	github.com/alibabacloud-go/cs-20151215/v2 v2.4.5
@@ -17,7 +17,7 @@ require (
 	github.com/rancher/norman v0.0.0-20200820172041-261460ee9088
 	github.com/rancher/rancher/pkg/client v0.0.0-20211110212758-cc2b8beb1473
 	github.com/savioxavier/termlink v1.3.0
-	github.com/spf13/cobra v1.8.0
+	github.com/spf13/cobra v1.8.1
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/common v1.0.948
 	github.com/tencentcloud/tencentcloud-sdk-go/tencentcloud/tke v1.0.929
 	k8s.io/api v0.30.0
@@ -53,7 +53,7 @@ require (
 	github.com/clbanning/mxj/v2 v2.5.5 // indirect
 	github.com/client9/misspell v0.3.4 // indirect
 	github.com/containerd/console v1.0.3 // indirect
-	github.com/cpuguy83/go-md2man/v2 v2.0.3 // indirect
+	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/emicklei/go-restful/v3 v3.11.0 // indirect
 	github.com/evanphx/json-patch v4.12.0+incompatible // indirect

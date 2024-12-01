@@ -17,10 +17,10 @@ func AllActivePods(clientSet kubernetes.Interface) ([]v1.Pod, error) {
 	return allPods.Items, nil
 }
 
-func GpuInPod(pod *v1.Pod) (gpuCount int64) {
+func GpuInPod(pod *v1.Pod, xpuType v1.ResourceName) (gpuCount int64) {
 	containers := pod.Spec.Containers
 	for _, container := range containers {
-		val, ok := container.Resources.Limits["nvidia.com/gpu"]
+		val, ok := container.Resources.Limits[xpuType]
 		if !ok {
 			continue
 		}

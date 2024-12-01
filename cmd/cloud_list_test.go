@@ -3,7 +3,7 @@ package cmd
 import (
 	"testing"
 
-	"github.com/sunny0826/kubecm/pkg/cloud"
+	"github.com/BussanQ/kubecm/pkg/cloud"
 )
 
 func Test_printListTable(t *testing.T) {

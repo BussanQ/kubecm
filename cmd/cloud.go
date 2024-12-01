@@ -6,9 +6,9 @@ import (
 	"os"
 	"strings"
 
+	"github.com/BussanQ/kubecm/pkg/cloud"
 	"github.com/manifoldco/promptui"
 	"github.com/spf13/cobra"
-	"github.com/sunny0826/kubecm/pkg/cloud"
 )
 
 // CloudCommand cloud command struct

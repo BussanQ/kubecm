@@ -9,12 +9,12 @@ import (
 
 	"github.com/savioxavier/termlink"
 
+	"github.com/BussanQ/kubecm/pkg/update"
 	"github.com/cli/safeexec"
-	"github.com/sunny0826/kubecm/pkg/update"
 
+	v "github.com/BussanQ/kubecm/version"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
-	v "github.com/sunny0826/kubecm/version"
 )
 
 // VersionCommand version cmd struct
