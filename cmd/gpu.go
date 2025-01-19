@@ -7,6 +7,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"strconv"
 )
@@ -54,6 +55,7 @@ func (gc *GpuCommand) Init() {
 var xpuType = map[string]v1.ResourceName{
 	"NVIDIA": "nvidia.com/gpu",
 	"DCU":    "hygon.com/dcu",
+	"ASCEND": "huawei.com/Ascend910",
 }
 
 func getGpu() (*gpuCluster, error) {
@@ -71,17 +73,14 @@ func getGpu() (*gpuCluster, error) {
 	}
 	var cluster gpuCluster
 	for _, node := range nodes.Items {
-		gpuNum, ok := node.Status.Capacity["nvidia.com/gpu"]
-		if !ok {
-			var okDcu bool
-			gpuNum, okDcu = node.Status.Capacity["hygon.com/dcu"]
-			if !okDcu {
-				continue
-			} else {
-				cluster.GpuType = "DCU"
+		var gpuNum resource.Quantity
+		var ok bool
+		for k, v := range xpuType {
+			gpuNum, ok = node.Status.Capacity[v]
+			if ok {
+				cluster.GpuType = k
+				break
 			}
-		} else {
-			cluster.GpuType = "NVIDIA"
 		}
 		gpuNumI, _ := strconv.Atoi(gpuNum.String())
 		for _, pod := range allPod {
