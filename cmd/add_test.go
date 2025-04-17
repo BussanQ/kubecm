@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"k8s.io/client-go/tools/clientcmd"
-
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
 
@@ -40,15 +39,6 @@ var (
 			"federal": {AuthInfo: "red-user", Cluster: "cow-cluster", Namespace: "hammer-ns"},
 		},
 	}
-	handleConfig = clientcmdapi.Config{
-		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"red-user-cbc897d6ch": {Token: "red-token"}},
-		Clusters: map[string]*clientcmdapi.Cluster{
-			"cow-cluster-cbc897d6ch": {Server: "http://cow.org:8080"}},
-		Contexts: map[string]*clientcmdapi.Context{
-			"federal-context": {AuthInfo: "red-user-cbc897d6ch", Cluster: "cow-cluster-cbc897d6ch", Namespace: "hammer-ns"},
-		},
-	}
 	handleNotExistConfig = clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
 			"not-exist": {Token: "not-exist-token"}},
@@ -60,24 +50,18 @@ var (
 	}
 	mergedConfig = clientcmdapi.Config{
 		AuthInfos: map[string]*clientcmdapi.AuthInfo{
-			"black-user":            {Token: "black-token"},
-			"red-user":              {Token: "red-token"},
-			"red-user-cbc897d6ch":   {Token: "red-token"},
-			"black-user-d2m9fd8b7d": {Token: "black-token"},
-			"not-exist":             {Token: "not-exist-token"},
+			"black-user": {Token: "black-token"},
+			"red-user":   {Token: "red-token"},
+			"not-exist":  {Token: "not-exist-token"},
 		},
 		Clusters: map[string]*clientcmdapi.Cluster{
-			"pig-cluster":            {Server: "http://pig.org:8080"},
-			"cow-cluster":            {Server: "http://cow.org:8080"},
-			"cow-cluster-cbc897d6ch": {Server: "http://cow.org:8080"},
-			"pig-cluster-d2m9fd8b7d": {Server: "http://pig.org:8080"},
-			"not-exist":              {Server: "http://not.exist:8080"},
+			"pig-cluster": {Server: "http://pig.org:8080"},
+			"cow-cluster": {Server: "http://cow.org:8080"},
+			"not-exist":   {Server: "http://not.exist:8080"},
 		},
 		Contexts: map[string]*clientcmdapi.Context{
 			"root":              {AuthInfo: "black-user", Cluster: "pig-cluster", Namespace: "saw-ns"},
 			"federal":           {AuthInfo: "red-user", Cluster: "cow-cluster", Namespace: "hammer-ns"},
-			"root-context":      {AuthInfo: "black-user-d2m9fd8b7d", Cluster: "pig-cluster-d2m9fd8b7d", Namespace: "saw-ns"},
-			"federal-context":   {AuthInfo: "red-user-cbc897d6ch", Cluster: "cow-cluster-cbc897d6ch", Namespace: "hammer-ns"},
 			"not-exist-context": {AuthInfo: "not-exist", Cluster: "not-exist", Namespace: "not-exist-ns"},
 		},
 	}
@@ -250,7 +234,7 @@ func TestKubeConfig_handleContext(t *testing.T) {
 		want   *clientcmdapi.Config
 	}{
 		// TODO: Add more test cases.
-		{"one", fields{config: newConfig}, args{"federal-context", &testCtx}, &handleConfig},
+		{"one", fields{config: newConfig}, args{"federal-context", &testCtx}, clientcmdapi.NewConfig()},
 		{"two", fields{config: newConfig}, args{"not-exist-context", &testNotExistCtx}, &handleNotExistConfig},
 	}
 	for _, tt := range tests {
@@ -351,7 +335,7 @@ func TestAddToLocal(t *testing.T) {
 	}
 
 	// Test AddToLocal function
-	err = AddToLocal(newConfig, tempFile.Name(), "", true, false, []string{"context"}, []string{})
+	err = AddToLocal(newConfig, tempFile.Name(), "", true, false, []string{"context"}, []string{}, false)
 	if err != nil {
 		t.Fatalf("Failed to add to local: %v", err)
 	}
@@ -445,5 +429,270 @@ func TestGenerateContextName(t *testing.T) {
 				t.Errorf("generateContextName() = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestAddToLocal_InsecureSkipTLSVerify(t *testing.T) {
+	oldCfg := clientcmdapi.Config{
+		Contexts: map[string]*clientcmdapi.Context{
+			"old-context": {AuthInfo: "old-user", Cluster: "old-cluster"},
+		},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"old-user": {},
+		},
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"old-cluster": {Server: "https://old.example.org"},
+		},
+		CurrentContext: "old-context",
+	}
+
+	oldFile, err := os.CreateTemp("", "old-kubeconfig-*.yaml")
+	if err != nil {
+		t.Fatalf("failed to create temp file for old config: %v", err)
+	}
+	defer os.Remove(oldFile.Name())
+	defer oldFile.Close()
+
+	if err := clientcmd.WriteToFile(oldCfg, oldFile.Name()); err != nil {
+		t.Fatalf("failed to write old config to file: %v", err)
+	}
+
+	cfgFile = oldFile.Name()
+
+	newCfg := &clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"test-cluster": {
+				Server:                   "https://test.example.org",
+				CertificateAuthority:     "/fake/ca/path",
+				CertificateAuthorityData: []byte("fake-ca-data"),
+				InsecureSkipTLSVerify:    false,
+			},
+		},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"test-authinfo": {Token: "test-token"},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			"test-context": {
+				AuthInfo:  "test-authinfo",
+				Cluster:   "test-cluster",
+				Namespace: "test-namespace",
+			},
+		},
+		CurrentContext: "test-context",
+	}
+
+	tests := []struct {
+		name                   string
+		insecureSkipTLSVerify  bool
+		wantInsecureSkipTLS    bool
+		wantCertificateAuthNil bool
+	}{
+		{
+			name:                   "InsecureSkipTLSVerify=false",
+			insecureSkipTLSVerify:  false,
+			wantInsecureSkipTLS:    false,
+			wantCertificateAuthNil: false, // dont clear CA
+		},
+		{
+			name:                   "InsecureSkipTLSVerify=true",
+			insecureSkipTLSVerify:  true,
+			wantInsecureSkipTLS:    true,
+			wantCertificateAuthNil: true, // will clear CA
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := clientcmd.WriteToFile(oldCfg, oldFile.Name()); err != nil {
+				t.Fatalf("failed to re-write old config to file: %v", err)
+			}
+
+			err = AddToLocal(
+				newCfg.DeepCopy(),
+				"fake-path",
+				"",
+				true,
+				false,
+				[]string{"context"},
+				[]string{},
+				tt.insecureSkipTLSVerify,
+			)
+			if err != nil {
+				t.Fatalf("AddToLocal() failed: %v", err)
+			}
+
+			merged, err := clientcmd.LoadFromFile(oldFile.Name())
+			if err != nil {
+				t.Fatalf("failed to load config from file: %v", err)
+			}
+
+			cluster, ok := merged.Clusters["test-cluster"]
+			if !ok {
+				t.Fatalf("cluster 'test-cluster' not found in merged config")
+			}
+
+			if cluster.InsecureSkipTLSVerify != tt.wantInsecureSkipTLS {
+				t.Errorf("got InsecureSkipTLSVerify=%v, want %v",
+					cluster.InsecureSkipTLSVerify, tt.wantInsecureSkipTLS)
+			}
+
+			if tt.wantCertificateAuthNil {
+				if cluster.CertificateAuthority != "" || len(cluster.CertificateAuthorityData) != 0 {
+					t.Errorf("CertificateAuthority/CertificateAuthorityData not cleared, got path=%q data=%q",
+						cluster.CertificateAuthority, string(cluster.CertificateAuthorityData))
+				}
+			} else {
+				if cluster.CertificateAuthority != "/fake/ca/path" ||
+					string(cluster.CertificateAuthorityData) != "fake-ca-data" {
+					t.Errorf("CertificateAuthority/CertificateAuthorityData changed unexpectedly, got path=%q data=%q",
+						cluster.CertificateAuthority, string(cluster.CertificateAuthorityData))
+				}
+			}
+		})
+	}
+}
+
+func TestIsSameKubeConfigAlreadyExist(t *testing.T) {
+	oldCfg := &clientcmdapi.Config{
+		Clusters: map[string]*clientcmdapi.Cluster{
+			"test-cluster": {
+				Server:                   "https://test.example.org",
+				CertificateAuthority:     "/fake/ca/path",
+				CertificateAuthorityData: []byte("fake-ca-data"),
+				InsecureSkipTLSVerify:    false,
+			},
+		},
+		AuthInfos: map[string]*clientcmdapi.AuthInfo{
+			"test-authinfo": {Token: "test-token"},
+		},
+		Contexts: map[string]*clientcmdapi.Context{
+			"test-context": {
+				AuthInfo:  "test-authinfo",
+				Cluster:   "test-cluster",
+				Namespace: "test-namespace",
+			},
+		},
+		CurrentContext: "test-context",
+	}
+
+	tests := []struct {
+		name  string
+		kco   *KubeConfigOption
+		exist bool
+	}{
+		{
+			name: "same cluster and user info already exist",
+			kco: &KubeConfigOption{
+				config: &clientcmdapi.Config{
+					Clusters: map[string]*clientcmdapi.Cluster{
+						"test-cluster": {
+							Server:                   "https://test.example.org",
+							CertificateAuthority:     "/fake/ca/path",
+							CertificateAuthorityData: []byte("fake-ca-data"),
+							InsecureSkipTLSVerify:    false,
+						},
+					},
+					AuthInfos: map[string]*clientcmdapi.AuthInfo{
+						"test-authinfo": {Token: "test-token"},
+					},
+					Contexts: map[string]*clientcmdapi.Context{
+						"test-context": {
+							AuthInfo:  "test-authinfo",
+							Cluster:   "test-cluster",
+							Namespace: "test-namespace",
+						},
+					},
+					CurrentContext: "test-context",
+				},
+			},
+			exist: true,
+		},
+		{
+			name: "different cluster and user info",
+			kco: &KubeConfigOption{
+				config: &clientcmdapi.Config{
+					Clusters: map[string]*clientcmdapi.Cluster{
+						"test-cluster": {
+							Server:                   "https://test1.example.org",
+							CertificateAuthority:     "/fake/ca/path",
+							CertificateAuthorityData: []byte("fake-ca-data"),
+							InsecureSkipTLSVerify:    false,
+						},
+					},
+					AuthInfos: map[string]*clientcmdapi.AuthInfo{
+						"test-authinfo": {Token: "test1-token"},
+					},
+					Contexts: map[string]*clientcmdapi.Context{
+						"test-context": {
+							AuthInfo:  "test-authinfo",
+							Cluster:   "test-cluster",
+							Namespace: "test-namespace",
+						},
+					},
+					CurrentContext: "test-context",
+				},
+			},
+			exist: false,
+		},
+		{
+			name: "different cluster info but same user info",
+			kco: &KubeConfigOption{
+				config: &clientcmdapi.Config{
+					Clusters: map[string]*clientcmdapi.Cluster{
+						"test-cluster": {
+							Server:                   "https://test2.example.org",
+							CertificateAuthority:     "/fake/ca/path",
+							CertificateAuthorityData: []byte("fake-ca-data"),
+							InsecureSkipTLSVerify:    false,
+						},
+					},
+					AuthInfos: map[string]*clientcmdapi.AuthInfo{
+						"test-authinfo": {Token: "test-token"},
+					},
+					Contexts: map[string]*clientcmdapi.Context{
+						"test-context": {
+							AuthInfo:  "test-authinfo",
+							Cluster:   "test-cluster",
+							Namespace: "test-namespace",
+						},
+					},
+					CurrentContext: "test-context",
+				},
+			},
+			exist: false,
+		},
+		{
+			name: "same cluster info but different user info",
+			kco: &KubeConfigOption{
+				config: &clientcmdapi.Config{
+					Clusters: map[string]*clientcmdapi.Cluster{
+						"test-cluster": {
+							Server:                   "https://test.example.org",
+							CertificateAuthority:     "/fake/ca/path",
+							CertificateAuthorityData: []byte("fake-ca-data"),
+							InsecureSkipTLSVerify:    false,
+						},
+					},
+					AuthInfos: map[string]*clientcmdapi.AuthInfo{
+						"test-authinfo": {Token: "test2-token"},
+					},
+					Contexts: map[string]*clientcmdapi.Context{
+						"test-context": {
+							AuthInfo:  "test-authinfo",
+							Cluster:   "test-cluster",
+							Namespace: "test-namespace",
+						},
+					},
+					CurrentContext: "test-context",
+				},
+			},
+			exist: false,
+		},
+	}
+
+	for _, tt := range tests {
+		if got := tt.kco.isSameKubeConfigAlreadyExist(oldCfg, tt.kco.config.Contexts["test-context"]); got != tt.exist {
+			t.Errorf("IsSameKubeConfigAlreadyExist() = %v, want %v", got, tt.exist)
+		}
 	}
 }

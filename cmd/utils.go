@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"github.com/lithammer/fuzzysearch/fuzzy"
 	"io"
 	"log"
 	"os"
@@ -164,8 +165,20 @@ func SelectUI(kubeItems []Needle, label string) int {
 	return s
 }
 
+// enterFullscreen enter fullscreen
+func enterFullscreen() {
+	fmt.Print("\033[?1049h\033[H")
+}
+
+// exitFullscreen exit fullscreen , restore terminal state
+func exitFullscreen() {
+	fmt.Print("\033[?1049l")
+}
+
 // selectUIRunner
 func selectUIRunner(kubeItems []Needle, label string, runner SelectRunner) (int, error) {
+	enterFullscreen()
+	defer exitFullscreen()
 	templates := &promptui.SelectTemplates{
 		Label:    "{{ . }}",
 		Active:   "\U0001F63C {{ .Name | red }}{{ .Center | red}}",
@@ -184,7 +197,7 @@ func selectUIRunner(kubeItems []Needle, label string, runner SelectRunner) (int,
 		if input == "q" && name == "<exit>" {
 			return true
 		}
-		return strings.Contains(name, input)
+		return fuzzy.Match(input, name)
 	}
 	prompt := promptui.Select{
 		Label:     label,
@@ -450,6 +463,10 @@ func CheckAndTransformFilePath(path string, autoCreate bool) (string, error) {
 		return "", err
 	}
 	return path, nil
+}
+
+func compareKubeItems(a, b Needle) int {
+	return strings.Compare(a.Name, b.Name)
 }
 
 // CheckValidContext check and clean mismatched AuthInfo and Cluster

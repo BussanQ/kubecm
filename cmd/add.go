@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -11,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 	"golang.org/x/exp/slices"
+	"k8s.io/apimachinery/pkg/util/rand"
 	"k8s.io/client-go/tools/clientcmd"
 	clientcmdapi "k8s.io/client-go/tools/clientcmd/api"
 )
@@ -22,8 +22,9 @@ type AddCommand struct {
 
 // KubeConfigOption kubeConfig option
 type KubeConfigOption struct {
-	config   *clientcmdapi.Config
-	fileName string
+	config                *clientcmdapi.Config
+	fileName              string
+	insecureSkipTLSVerify bool
 }
 
 // Init AddCommand
@@ -45,6 +46,7 @@ func (ac *AddCommand) Init() {
 	ac.command.Flags().String("context-name", "", "override context name when add kubeconfig context, when context-name is set, context-prefix and context-template parameters will be ignored")
 	ac.command.Flags().StringSlice("context-template", []string{"context"}, "define the attributes used for composing the context name, available values: filename, user, cluster, context, namespace")
 	ac.command.Flags().Bool("select-context", false, "select the context to be added in interactive mode")
+	ac.command.Flags().Bool("insecure-skip-tls-verify", false, "if true, the server's certificate will not be checked for validity")
 	_ = ac.command.MarkFlagRequired("file")
 	ac.AddCommands(&DocsCommand{})
 }
@@ -57,6 +59,7 @@ func (ac *AddCommand) runAdd(cmd *cobra.Command, args []string) error {
 	contextName, _ := ac.command.Flags().GetString("context-name")
 	contextTemplate, _ := ac.command.Flags().GetStringSlice("context-template")
 	selectContext, _ := ac.command.Flags().GetBool("select-context")
+	insecureSkipTLSVerify, _ := ac.command.Flags().GetBool("insecure-skip-tls-verify")
 
 	var newConfig *clientcmdapi.Config
 
@@ -91,7 +94,7 @@ func (ac *AddCommand) runAdd(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	err = AddToLocal(newConfig, file, contextPrefix, cover, selectContext, contextTemplate, context)
+	err = AddToLocal(newConfig, file, contextPrefix, cover, selectContext, contextTemplate, context, insecureSkipTLSVerify)
 	if err != nil {
 		return err
 	}
@@ -99,14 +102,15 @@ func (ac *AddCommand) runAdd(cmd *cobra.Command, args []string) error {
 }
 
 // AddToLocal add kubeConfig to local
-func AddToLocal(newConfig *clientcmdapi.Config, path, contextPrefix string, cover bool, selectContext bool, contextTemplate []string, context []string) error {
+func AddToLocal(newConfig *clientcmdapi.Config, path, contextPrefix string, cover bool, selectContext bool, contextTemplate []string, context []string, insecureSkipTLSVerify bool) error {
 	oldConfig, err := clientcmd.LoadFromFile(cfgFile)
 	if err != nil {
 		return err
 	}
 	kco := &KubeConfigOption{
-		config:   newConfig,
-		fileName: getFileName(path),
+		config:                newConfig,
+		fileName:              getFileName(path),
+		insecureSkipTLSVerify: insecureSkipTLSVerify,
 	}
 	// merge context loop
 	outConfig, err := kco.handleContexts(oldConfig, contextPrefix, selectContext, contextTemplate, context)
@@ -166,16 +170,19 @@ func (kc *KubeConfigOption) handleContexts(oldConfig *clientcmdapi.Config, conte
 			}
 		}
 
-		if checkContextName(newName, oldConfig) {
+		var quitNewName bool
+		for checkContextName(newName, oldConfig) {
 			nameConfirm := BoolUI(fmt.Sprintf("「%s」 Name already exists, do you want to rename it? (If you select `False`, this context will not be merged)", newName))
 			if nameConfirm == "True" {
 				newName = PromptUI("Rename", newName)
-				if newName == kc.fileName {
-					return nil, errors.New("need to rename")
-				}
-			} else {
 				continue
+			} else {
+				quitNewName = true
+				break
 			}
+		}
+		if quitNewName {
+			continue
 		}
 		itemConfig := kc.handleContext(oldConfig, newName, ctx)
 		newConfig = appendConfig(newConfig, itemConfig)
@@ -213,22 +220,43 @@ func checkContextName(name string, oldConfig *clientcmdapi.Config) bool {
 	return false
 }
 
-func checkClusterAndUserName(oldConfig *clientcmdapi.Config, newClusterName, newUserName string) (bool, bool) {
+// checkClusterAndUserName check if the cluster and user exist in the same context, or just cluster or user exist
+func checkClusterAndUserName(oldConfig *clientcmdapi.Config, newClusterName, newUserName string) (bool, bool, bool) {
 	var (
-		isClusterNameExist bool
-		isUserNameExist    bool
+		clusterAndUserNameExistInSameContext bool
+		justClusterNameExist                 bool
+		justUserNameExist                    bool
 	)
 
 	for _, ctx := range oldConfig.Contexts {
+		if ctx.Cluster == newClusterName && ctx.AuthInfo == newUserName {
+			clusterAndUserNameExistInSameContext = true
+		}
 		if ctx.Cluster == newClusterName {
-			isClusterNameExist = true
+			justClusterNameExist = true
 		}
 		if ctx.AuthInfo == newUserName {
-			isUserNameExist = true
+			justUserNameExist = true
 		}
 	}
 
-	return isClusterNameExist, isUserNameExist
+	return clusterAndUserNameExistInSameContext, justClusterNameExist, justUserNameExist
+}
+
+// isSameKubeConfigAlreadyExist return true if the same kubeconfig is already
+// exist, assert by cluster, user name and corresponding cluster and user info
+func (kc *KubeConfigOption) isSameKubeConfigAlreadyExist(oldConfig *clientcmdapi.Config, ctx *clientcmdapi.Context) bool {
+	oldCluster, ok := oldConfig.Clusters[ctx.Cluster]
+	if !ok {
+		return false
+	}
+
+	oldUser, ok := oldConfig.AuthInfos[ctx.AuthInfo]
+	if !ok {
+		return false
+	}
+
+	return reflect.DeepEqual(oldCluster, kc.config.Clusters[ctx.Cluster]) && reflect.DeepEqual(oldUser, kc.config.AuthInfos[ctx.AuthInfo])
 }
 
 func (kc *KubeConfigOption) handleContext(oldConfig *clientcmdapi.Config,
@@ -239,22 +267,54 @@ func (kc *KubeConfigOption) handleContext(oldConfig *clientcmdapi.Config,
 		userNameSuffix    string
 	)
 
-	isClusterNameExist, isUserNameExist := checkClusterAndUserName(oldConfig, ctx.Cluster, ctx.AuthInfo)
 	newConfig := clientcmdapi.NewConfig()
-	suffix := HashSufString(name)
+	bothExistInSameContext, justClusterNameExist, justUserNameExist := checkClusterAndUserName(oldConfig, ctx.Cluster, ctx.AuthInfo)
+	// if same kubeconfig is already exist, skip it
+	if bothExistInSameContext {
+		if kc.isSameKubeConfigAlreadyExist(oldConfig, ctx) {
+			return newConfig
+		}
+	}
+	suffix := rand.String(10)
 
-	if isClusterNameExist {
+	if justClusterNameExist {
 		clusterNameSuffix = "-" + suffix
 	}
-	if isUserNameExist {
+	if justUserNameExist {
 		userNameSuffix = "-" + suffix
 	}
 
 	userName := fmt.Sprintf("%v%v", ctx.AuthInfo, userNameSuffix)
 	clusterName := fmt.Sprintf("%v%v", ctx.Cluster, clusterNameSuffix)
 	newCtx := ctx.DeepCopy()
-	newConfig.AuthInfos[userName] = kc.config.AuthInfos[newCtx.AuthInfo]
-	newConfig.Clusters[clusterName] = kc.config.Clusters[newCtx.Cluster]
+
+	// deep copy and clear CA data
+	cluster := kc.config.Clusters[newCtx.Cluster].DeepCopy()
+	if kc.insecureSkipTLSVerify {
+		cluster.InsecureSkipTLSVerify = true
+		cluster.CertificateAuthority = ""
+		cluster.CertificateAuthorityData = nil
+	}
+
+	var clusterInfoExist, userInfoExist bool
+	for _, oldCluster := range oldConfig.Clusters {
+		if reflect.DeepEqual(oldCluster, cluster) {
+			clusterInfoExist = true
+		}
+	}
+	if !clusterInfoExist {
+		newConfig.Clusters[clusterName] = cluster
+	}
+
+	for _, oldUser := range oldConfig.AuthInfos {
+		if reflect.DeepEqual(oldUser, kc.config.AuthInfos[newCtx.AuthInfo]) {
+			userInfoExist = true
+		}
+	}
+	if !userInfoExist {
+		newConfig.AuthInfos[userName] = kc.config.AuthInfos[newCtx.AuthInfo]
+	}
+
 	newConfig.Contexts[name] = newCtx
 	newConfig.Contexts[name].AuthInfo = userName
 	newConfig.Contexts[name].Cluster = clusterName
@@ -265,7 +325,7 @@ func (kc *KubeConfigOption) handleContext(oldConfig *clientcmdapi.Config,
 func addExample() string {
 	return `
 # Merge test.yaml with $HOME/.kube/config
-kubecm add -f test.yaml 
+kubecm add -f test.yaml
 # Merge test.yaml with $HOME/.kube/config and add a prefix before context name
 kubecm add -cf test.yaml --context-prefix test
 # Merge test.yaml with $HOME/.kube/config and define the attributes used for composing the context name
@@ -280,5 +340,7 @@ kubecm add -f test.yaml --select-context
 kubecm add -f test.yaml --context context1,context2
 # Add kubeconfig from stdin
 cat /etc/kubernetes/admin.conf | kubecm add -f -
+# Merge test.yaml with $HOME/.kube/config and skip TLS certificate verification
+kubecm add -f test.yaml --insecure-skip-tls-verify
 `
 }

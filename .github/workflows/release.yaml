@@ -28,15 +28,15 @@ jobs:
         with:
           # either 'goreleaser' (default) or 'goreleaser-pro'
           distribution: goreleaser
-          version: latest
+          version: "~> v2"
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Bump formulae
-        uses: dawidd6/action-homebrew-bump-formula@v3
+        uses: dawidd6/action-homebrew-bump-formula@v4
         continue-on-error: true
         with:
           token: ${{ secrets.HOMEBREW_TOKEN }}
           formula: kubecm
       - name: Update new version in krew-index
-        uses: rajatjindal/krew-release-bot@v0.0.46
+        uses: rajatjindal/krew-release-bot@v0.0.47
