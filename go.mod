@@ -1,6 +1,6 @@
 module github.com/BussanQ/kubecm
 
-go 1.22.9
+go 1.23.3
 
 require (
 	github.com/alibabacloud-go/cs-20151215/v2 v2.4.5

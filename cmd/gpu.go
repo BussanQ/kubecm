@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/BussanQ/kubecm/pkg/utils"
+	"github.com/fatih/color"
 	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
@@ -59,8 +60,8 @@ func (gc *GpuCommand) Init() {
 				ansi.Color("GPU 类型", "red"),
 				ansi.Color(g.GpuType, "white+h"))
 			fmt.Printf("%s: %s\n",
-				ansi.Color("GPU 总量", "green"),
-				ansi.Color(strconv.Itoa(g.GpuNum), "white+h"))
+				color.GreenString("GPU 总量"),
+				color.HiWhiteString(strconv.Itoa(g.GpuNum)))
 			fmt.Printf("%s: %s\n",
 				ansi.Color("GPU 使用", "red"),
 				ansi.Color(strconv.Itoa(g.GpuUse), "white+h"))
