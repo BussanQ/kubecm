@@ -13,14 +13,12 @@ import (
 	"strings"
 )
 
-var ResourceMap = map[string]v1.ResourceName{
+var xpuType = map[string]v1.ResourceName{
 	"NVIDIA":    v1.ResourceName("nvidia.com/gpu"),
 	"DCU":       v1.ResourceName("hygon.com/dcu"),
 	"ASCEND":    v1.ResourceName("huawei.com/Ascend910"),
 	"KUNLUNXIN": v1.ResourceName("kunlunxin.com/xpu"),
 }
-
-var GpuTypeDict = []string{"NVIDIA", "DCU", "ASCEND", "KUNLUNXIN"}
 
 type GpuCommand struct {
 	BaseCommand
@@ -99,8 +97,8 @@ func getGpu() (*gpuCluster, error) {
 		var ok bool
 		var gpuNum resource.Quantity
 		var gpu gpuNode
-		for _, gpuType := range GpuTypeDict {
-			gpuNum, ok = node.Status.Capacity[ResourceMap[gpuType]]
+		for gpuType, gpuResource := range xpuType {
+			gpuNum, ok = node.Status.Capacity[gpuResource]
 			if ok {
 				cluster.GpuType = gpuType
 				gpu.GpuType = gpuType
@@ -134,7 +132,7 @@ func getGpu() (*gpuCluster, error) {
 		gpuNumI, _ := strconv.Atoi(gpuNum.String())
 		for _, pod := range allPod {
 			if pod.Spec.NodeName == node.Name {
-				gpuUse := utils.GpuInPod(&pod, ResourceMap[cluster.GpuType])
+				gpuUse := utils.GpuInPod(&pod, xpuType[cluster.GpuType])
 				if gpuUse > 0 {
 					cluster.GpuPod += fmt.Sprintf("%s | %s| %s| %d卡 \n",
 						pod.Namespace, pod.Name, pod.Spec.NodeName, gpuUse)
