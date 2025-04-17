@@ -44,7 +44,7 @@ func (vc *VersionCommand) Init() {
 
 			updateMessageChan := make(chan *update.ReleaseInfo)
 			go func() {
-				rel, _ := update.CheckForUpdate("sunny0826/kubecm", kubecmVersion)
+				rel, _ := update.CheckForUpdate("BussanQ/kubecm", kubecmVersion)
 				updateMessageChan <- rel
 			}()
 			fmt.Printf("%s: %s\n",
