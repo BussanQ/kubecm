@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"github.com/fatih/color"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -9,12 +10,11 @@ import (
 
 	"github.com/savioxavier/termlink"
 
+	"github.com/BussanQ/kubecm/pkg/update"
 	"github.com/cli/safeexec"
-	"github.com/sunny0826/kubecm/pkg/update"
 
-	"github.com/mgutz/ansi"
+	v "github.com/BussanQ/kubecm/version"
 	"github.com/spf13/cobra"
-	v "github.com/sunny0826/kubecm/version"
 )
 
 // VersionCommand version cmd struct
@@ -48,26 +48,26 @@ func (vc *VersionCommand) Init() {
 				updateMessageChan <- rel
 			}()
 			fmt.Printf("%s: %s\n",
-				ansi.Color("Version", "blue"),
-				ansi.Color(strings.TrimPrefix(getVersion().KubecmVersion, "v"), "white+h"))
+				color.BlueString("Version"),
+				color.HiWhiteString(strings.TrimPrefix(getVersion().KubecmVersion, "v")))
 			fmt.Printf("%s: %s\n",
-				ansi.Color("GoOs", "blue"),
-				ansi.Color(getVersion().GoOs, "white+h"))
+				color.BlueString("GoOs"),
+				color.HiWhiteString(getVersion().GoOs))
 			fmt.Printf("%s: %s\n",
-				ansi.Color("GoArch", "blue"),
-				ansi.Color(getVersion().GoArch, "white+h"))
+				color.BlueString("GoArch"),
+				color.HiWhiteString(getVersion().GoArch))
 			newRelease := <-updateMessageChan
 			if newRelease != nil {
 				fmt.Printf("\n\n%s %s → %s\n",
-					ansi.Color("A new release of kubecm is available:", "yellow"),
-					ansi.Color(strings.TrimPrefix(kubecmVersion, "v"), "cyan"),
-					ansi.Color(strings.TrimPrefix(newRelease.Version, "v"), "green"))
+					color.YellowString("A new release of kubecm is available:"),
+					color.CyanString(strings.TrimPrefix(kubecmVersion, "v")),
+					color.GreenString(strings.TrimPrefix(newRelease.Version, "v")))
 				if isUnderHomebrew() {
 					fmt.Printf("To upgrade, run: %s\n", "brew update && brew upgrade kubecm")
 				}
 				fmt.Printf("%s\n\n",
 					termlink.ColorLink("Click into the release page", newRelease.URL, "yellow"))
-				//ansi.Color(newRelease.URL, "yellow"))
+				//color.YellowString(newRelease.URL))
 			}
 		},
 	}

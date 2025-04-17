@@ -26,3 +26,4 @@ example.yaml
 merge/
 
 *-kubeconfig.yaml
+/go.sum

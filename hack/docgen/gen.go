@@ -4,8 +4,8 @@ import (
 	"github.com/spf13/cobra"
 	"log"
 
+	"github.com/BussanQ/kubecm/cmd"
 	"github.com/spf13/cobra/doc"
-	"github.com/sunny0826/kubecm/cmd"
 )
 
 func main() {

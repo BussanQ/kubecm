@@ -3,14 +3,12 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"github.com/BussanQ/kubecm/pkg/cloud"
+	"github.com/fatih/color"
+	"github.com/spf13/cobra"
+	"k8s.io/client-go/tools/clientcmd"
 	"os"
 	"strings"
-
-	"github.com/mgutz/ansi"
-
-	"github.com/spf13/cobra"
-	"github.com/sunny0826/kubecm/pkg/cloud"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 // CloudAddCommand add command struct
@@ -227,8 +225,8 @@ func (ca *CloudAddCommand) runCloudAdd(cmd *cobra.Command, args []string) error 
 			return err
 		}
 		fmt.Printf("%s: %s\n",
-			ansi.Color("Note", "blue"),
-			ansi.Color(" please install the AWS CLI before normal use.", "white+h"))
+			color.BlueString("Note"),
+			color.HiWhiteString(" please install the AWS CLI before normal use."))
 	case 4:
 		fmt.Println("⛅  Selected: Azure")
 		authModes := []string{"Default (SDK Auth)", "Service Principal"}
