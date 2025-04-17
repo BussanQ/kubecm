@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"github.com/BussanQ/kubecm/pkg/utils"
 	"github.com/fatih/color"
-	"github.com/mgutz/ansi"
 	"github.com/spf13/cobra"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/resource"
@@ -57,22 +56,22 @@ func (gc *GpuCommand) Init() {
 				return err
 			}
 			fmt.Printf("%s: %s\n",
-				ansi.Color("GPU 类型", "red"),
-				ansi.Color(g.GpuType, "white+h"))
+				color.RedString("GPU 类型"),
+				color.HiWhiteString(g.GpuType))
 			fmt.Printf("%s: %s\n",
 				color.GreenString("GPU 总量"),
 				color.HiWhiteString(strconv.Itoa(g.GpuNum)))
 			fmt.Printf("%s: %s\n",
-				ansi.Color("GPU 使用", "red"),
-				ansi.Color(strconv.Itoa(g.GpuUse), "white+h"))
+				color.RedString("GPU 使用"),
+				color.HiWhiteString(strconv.Itoa(g.GpuUse)))
 			fmt.Printf("%s:\n%s",
-				ansi.Color("GPU Pod ", "green"),
-				ansi.Color(g.GpuPod, "white+h"))
-			fmt.Printf("%s:\n", ansi.Color("GPU Node", "red"))
+				color.GreenString("GPU Pod "),
+				color.HiWhiteString(g.GpuPod))
+			fmt.Printf("%s:\n", color.RedString("GPU Node"))
 			for _, node := range g.GpuNode {
 				fmt.Printf("%s\n",
-					ansi.Color(fmt.Sprintf("%s | %d/%d | %s",
-						node.NodeName, node.GpuUse, node.GpuNum, node.Ip), "white+h"))
+					color.HiWhiteString(fmt.Sprintf("%s | %d/%d | %s",
+						node.NodeName, node.GpuUse, node.GpuNum, node.Ip)))
 			}
 			return nil
 		},

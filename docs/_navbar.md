@@ -1,2 +1,0 @@
-- [🏡 Home](/)
-- [💫 Contribute](/en-us/contribute.md)

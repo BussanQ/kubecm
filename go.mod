@@ -13,7 +13,6 @@ require (
 	github.com/fatih/color v1.18.0
 	github.com/imdario/mergo v0.3.15
 	github.com/manifoldco/promptui v0.3.2
-	github.com/mgutz/ansi v0.0.0-20200706080929-d51e80ef957d
 	github.com/pterm/pterm v0.12.79
 	github.com/rancher/norman v0.5.1
 	github.com/rancher/rancher/pkg/client v0.0.0-20211110212758-cc2b8beb1473
